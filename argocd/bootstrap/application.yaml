@@ -1,0 +1,19 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: rs-cloud
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/ricardo-saad/rs-cloud.git
+    targetRevision: main
+    path: argocd/apps
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+  syncPolicy:
+    syncOptions:
+      - CreateNamespace=false
+      - PruneLast=true
+      - RespectIgnoreDifferences=true

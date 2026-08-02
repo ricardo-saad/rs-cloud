@@ -1,0 +1,39 @@
+apiVersion: policy.rs.io/v1
+kind: NetworkFlow
+metadata:
+  name: cloudflared-to-private-traefik
+spec:
+  source: cloudflared
+  destination: traefik-private
+  port: 8443
+  expected: deny
+---
+apiVersion: policy.rs.io/v1
+kind: NetworkFlow
+metadata:
+  name: cloudflared-to-console-private
+spec:
+  source: cloudflared
+  destination: rs-console-private
+  port: 8081
+  expected: deny
+---
+apiVersion: policy.rs.io/v1
+kind: NetworkFlow
+metadata:
+  name: arbitrary-workload-to-postgres
+spec:
+  source: arbitrary-workload
+  destination: postgres
+  port: 5432
+  expected: deny
+---
+apiVersion: policy.rs.io/v1
+kind: NetworkFlow
+metadata:
+  name: console-to-internet
+spec:
+  source: rs-console
+  destination: internet
+  port: 443
+  expected: deny

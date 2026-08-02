@@ -1,0 +1,36 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mutable-image
+  namespace: rs-console
+  annotations:
+    rs.io/network-policy: enforced
+spec:
+  selector:
+    matchLabels:
+      app: mutable-image
+  template:
+    metadata:
+      labels:
+        app: mutable-image
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: app
+          image: example.invalid/app:latest
+          resources:
+            requests:
+              cpu: 10m
+              memory: 16Mi
+            limits:
+              cpu: 20m
+              memory: 32Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            readOnlyRootFilesystem: true

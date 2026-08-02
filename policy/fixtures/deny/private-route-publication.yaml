@@ -1,0 +1,17 @@
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: leaked-private-route
+  namespace: rs-console
+  annotations:
+    rs.io/surface: public-human
+spec:
+  entryPoints:
+    - public
+  routes:
+    - kind: Rule
+      match: Path(`/v1/operator/bootstrap/start`)
+      services:
+        - kind: Service
+          name: rs-console-private
+          port: 8081

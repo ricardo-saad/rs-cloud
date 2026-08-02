@@ -1,0 +1,10 @@
+.DS_Store
+*.swp
+*.tmp
+.env
+.env.*
+!.env.example
+.idea/
+.vscode/
+rendered/
+policy/report/

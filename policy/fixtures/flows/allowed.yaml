@@ -1,0 +1,49 @@
+apiVersion: policy.rs.io/v1
+kind: NetworkFlow
+metadata:
+  name: cloudflared-to-public-traefik
+spec:
+  source: cloudflared
+  destination: traefik-public
+  port: 8000
+  expected: allow
+---
+apiVersion: policy.rs.io/v1
+kind: NetworkFlow
+metadata:
+  name: traefik-to-console-public
+spec:
+  source: traefik
+  destination: rs-console-public
+  port: 8080
+  expected: allow
+---
+apiVersion: policy.rs.io/v1
+kind: NetworkFlow
+metadata:
+  name: traefik-to-console-private
+spec:
+  source: traefik
+  destination: rs-console-private
+  port: 8081
+  expected: allow
+---
+apiVersion: policy.rs.io/v1
+kind: NetworkFlow
+metadata:
+  name: console-to-postgres
+spec:
+  source: rs-console
+  destination: postgres
+  port: 5432
+  expected: allow
+---
+apiVersion: policy.rs.io/v1
+kind: NetworkFlow
+metadata:
+  name: postgres-to-s3
+spec:
+  source: postgres
+  destination: s3
+  port: 443
+  expected: allow

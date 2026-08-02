@@ -1,0 +1,90 @@
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: platform-api
+  namespace: rs-console
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  secretName: platform-api-tls
+  issuerRef:
+    kind: ClusterIssuer
+    name: letsencrypt-production
+  dnsNames:
+    - platform-api.ricardosaad.com
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: rs-console-public
+  namespace: rs-console
+  annotations:
+    argocd.argoproj.io/sync-wave: "3"
+    rs.io/surface: public-human
+spec:
+  entryPoints:
+    - public
+  routes:
+    - kind: Rule
+      match: >-
+        Host(`platform-api.ricardosaad.com`) &&
+        (Path(`/health/live`) ||
+        Path(`/health/ready`) ||
+        Path(`/v1/capabilities`) ||
+        Path(`/v1/session`) ||
+        Path(`/v1/auth/login/start`) ||
+        Path(`/v1/auth/login/finish`) ||
+        Path(`/v1/auth/logout`) ||
+        Path(`/v1/auth/setup/start`) ||
+        Path(`/v1/auth/setup/finish`) ||
+        Path(`/v1/recovery/request`))
+      services:
+        - kind: Service
+          name: rs-console-public
+          namespace: rs-console
+          port: 8080
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: rs-console-private
+  namespace: rs-console
+  annotations:
+    argocd.argoproj.io/sync-wave: "3"
+    rs.io/surface: private-operator
+spec:
+  entryPoints:
+    - private
+  routes:
+    - kind: Rule
+      match: >-
+        Host(`platform-api.ricardosaad.com`) &&
+        (Path(`/health/live`) ||
+        Path(`/health/ready`) ||
+        Path(`/v1/capabilities`) ||
+        Path(`/v1/session`) ||
+        Path(`/v1/auth/login/start`) ||
+        Path(`/v1/auth/login/finish`) ||
+        Path(`/v1/auth/logout`) ||
+        Path(`/v1/auth/setup/start`) ||
+        Path(`/v1/auth/setup/finish`) ||
+        Path(`/v1/recovery/request`))
+      services:
+        - kind: Service
+          name: rs-console-public
+          namespace: rs-console
+          port: 8080
+    - kind: Rule
+      match: >-
+        Host(`platform-api.ricardosaad.com`) &&
+        (Path(`/v1/operator/bootstrap/start`) ||
+        Path(`/v1/operator/bootstrap/finish`) ||
+        PathPrefix(`/v1/operator/recoveries`) ||
+        Path(`/v1/operator/capabilities`))
+      services:
+        - kind: Service
+          name: rs-console-private
+          namespace: rs-console
+          port: 8081
+  tls:
+    secretName: platform-api-tls

@@ -1,0 +1,54 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:recommended"
+  ],
+  "dependencyDashboard": true,
+  "labels": [
+    "dependencies"
+  ],
+  "minimumReleaseAge": "3 days",
+  "pinDigests": true,
+  "rangeStrategy": "pin",
+  "schedule": [
+    "before 6am on Monday"
+  ],
+  "timezone": "Asia/Beirut",
+  "kubernetes": {
+    "managerFilePatterns": [
+      "/(^|/)platform/.+\\.ya?ml$/",
+      "/(^|/)services/.+\\.ya?ml$/"
+    ]
+  },
+  "packageRules": [
+    {
+      "description": "Group GitHub Actions updates",
+      "groupName": "GitHub Actions",
+      "matchManagers": [
+        "github-actions"
+      ]
+    },
+    {
+      "description": "Group Kubernetes dependency updates",
+      "groupName": "Kubernetes dependencies",
+      "matchManagers": [
+        "argocd",
+        "custom.regex",
+        "kubernetes"
+      ]
+    }
+  ],
+  "customManagers": [
+    {
+      "customType": "regex",
+      "managerFilePatterns": [
+        "/(^|/)platform/cloudnative-pg/operator/kustomization\\.yaml$/"
+      ],
+      "matchStrings": [
+        "releases/download/v(?<currentValue>[^/]+)/cnpg-[^/]+\\.yaml"
+      ],
+      "datasourceTemplate": "github-releases",
+      "depNameTemplate": "cloudnative-pg/cloudnative-pg"
+    }
+  ]
+}

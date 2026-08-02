@@ -1,0 +1,26 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: missing-security
+  namespace: rs-console
+  annotations:
+    rs.io/network-policy: enforced
+spec:
+  selector:
+    matchLabels:
+      app: missing-security
+  template:
+    metadata:
+      labels:
+        app: missing-security
+    spec:
+      containers:
+        - name: app
+          image: example.invalid/app@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+          resources:
+            requests:
+              cpu: 10m
+              memory: 16Mi
+            limits:
+              cpu: 20m
+              memory: 32Mi

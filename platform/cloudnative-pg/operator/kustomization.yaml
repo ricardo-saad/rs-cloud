@@ -1,0 +1,28 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  # Release asset SHA-256:
+  # f8bede43fe4ee0d478c2355b204a36876b2ae4faac60f2a9452280b293da3b88
+  - https://github.com/cloudnative-pg/cloudnative-pg/releases/download/v1.30.0/cnpg-1.30.0.yaml
+images:
+  - name: ghcr.io/cloudnative-pg/cloudnative-pg
+    newName: ghcr.io/cloudnative-pg/cloudnative-pg
+    digest: sha256:badb30338c32df9e0a1caea5a8013b1ace02e9a25f8d03f29b5e3a2dd285ab4f
+patches:
+  - target:
+      kind: Namespace
+      name: cnpg-system
+    patch: |-
+      - op: add
+        path: /metadata/annotations
+        value:
+          rs.io/default-deny: enforced
+      - op: add
+        path: /metadata/labels
+        value:
+          pod-security.kubernetes.io/enforce: restricted
+          pod-security.kubernetes.io/enforce-version: latest
+          pod-security.kubernetes.io/audit: restricted
+          pod-security.kubernetes.io/audit-version: latest
+          pod-security.kubernetes.io/warn: restricted
+          pod-security.kubernetes.io/warn-version: latest

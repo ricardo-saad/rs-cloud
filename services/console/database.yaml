@@ -1,0 +1,134 @@
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: encrypted-gp3
+  annotations:
+    storageclass.kubernetes.io/is-default-class: "false"
+provisioner: ebs.csi.aws.com
+reclaimPolicy: Retain
+allowVolumeExpansion: true
+volumeBindingMode: WaitForFirstConsumer
+parameters:
+  type: gp3
+  encrypted: "true"
+  fsType: ext4
+---
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: rs-console-db-app
+  namespace: rs-console
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+    rs.io/reload-contract: bootstrap-and-rollout-required
+spec:
+  refreshInterval: 1h
+  secretStoreRef:
+    kind: ClusterSecretStore
+    name: cluster-parameter-store
+  target:
+    name: rs-console-db-app
+    creationPolicy: Owner
+    template:
+      metadata:
+        annotations:
+          cnpg.io/reload: "true"
+  data:
+    - secretKey: username
+      remoteRef:
+        key: /cluster/rs-console/database
+        property: username
+    - secretKey: password
+      remoteRef:
+        key: /cluster/rs-console/database
+        property: password
+    - secretKey: uri
+      remoteRef:
+        key: /cluster/rs-console/database
+        property: uri
+---
+apiVersion: barmancloud.cnpg.io/v1
+kind: ObjectStore
+metadata:
+  name: rs-console-backups
+  namespace: rs-console
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+    rs.io/promotion-placeholder: backup-bucket
+spec:
+  configuration:
+    destinationPath: s3://REPLACE_AT_PROMOTION_BACKUP_BUCKET/rs-console
+    s3Credentials:
+      inheritFromIAMRole: true
+    wal:
+      compression: gzip
+      encryption: AES256
+      maxParallel: 2
+    data:
+      compression: gzip
+      encryption: AES256
+      jobs: 2
+    retentionPolicy: 30d
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: rs-console-postgres
+  namespace: rs-console
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+    rs.io/availability: single-primary-recoverable-not-ha
+    rs.io/promotion-placeholder: postgres-backup-role
+spec:
+  instances: 1
+  imageName: ghcr.io/cloudnative-pg/postgresql:18.4-202607200905-minimal-trixie@sha256:24d229d801663f95b584416f8ebdfad4849b1a3fa4cfcf95a7f026df7aa6e22d
+  enableSuperuserAccess: false
+  primaryUpdateStrategy: unsupervised
+  bootstrap:
+    initdb:
+      database: rs_console
+      owner: rs_console
+      secret:
+        name: rs-console-db-app
+  serviceAccountTemplate:
+    metadata:
+      annotations:
+        eks.amazonaws.com/role-arn: REPLACE_AT_PROMOTION_POSTGRES_BACKUP_ROLE_ARN
+  storage:
+    size: 20Gi
+    storageClass: encrypted-gp3
+    resizeInUseVolumes: true
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: "2"
+      memory: 2Gi
+  postgresql:
+    parameters:
+      password_encryption: scram-sha-256
+      ssl_min_protocol_version: TLSv1.3
+  plugins:
+    - name: barman-cloud.cloudnative-pg.io
+      parameters:
+        barmanObjectName: rs-console-backups
+        serverName: rs-console-postgres
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: ScheduledBackup
+metadata:
+  name: rs-console-postgres-daily
+  namespace: rs-console
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  schedule: 0 0 2 * * *
+  backupOwnerReference: self
+  immediate: true
+  suspend: false
+  cluster:
+    name: rs-console-postgres
+  method: plugin
+  pluginConfiguration:
+    name: barman-cloud.cloudnative-pg.io

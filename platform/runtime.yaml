@@ -1,0 +1,205 @@
+apiVersion: external-secrets.io/v1
+kind: ClusterSecretStore
+metadata:
+  name: cluster-parameter-store
+  annotations:
+    argocd.argoproj.io/sync-wave: "-8"
+spec:
+  provider:
+    aws:
+      service: ParameterStore
+      region: eu-west-2
+      auth:
+        jwt:
+          serviceAccountRef:
+            name: external-secrets
+            namespace: platform-system
+---
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: cloudflared-tunnel
+  namespace: ingress-system
+  annotations:
+    argocd.argoproj.io/sync-wave: "-7"
+    rs.io/reload-contract: restart-on-secret-change
+spec:
+  refreshInterval: 1h
+  secretStoreRef:
+    kind: ClusterSecretStore
+    name: cluster-parameter-store
+  target:
+    name: cloudflared-tunnel
+    creationPolicy: Owner
+  data:
+    - secretKey: token
+      remoteRef:
+        key: /cluster/cloudflared/tunnel-token
+---
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: cert-manager-cloudflare
+  namespace: platform-system
+  annotations:
+    argocd.argoproj.io/sync-wave: "-7"
+    rs.io/reload-contract: controller-reloads-referenced-secret
+spec:
+  refreshInterval: 1h
+  secretStoreRef:
+    kind: ClusterSecretStore
+    name: cluster-parameter-store
+  target:
+    name: cert-manager-cloudflare
+    creationPolicy: Owner
+  data:
+    - secretKey: api-token
+      remoteRef:
+        key: /cluster/cert-manager/cloudflare-api-token
+---
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-production
+  annotations:
+    argocd.argoproj.io/sync-wave: "-6"
+spec:
+  acme:
+    email: REPLACE_AT_PROMOTION_ACME_EMAIL
+    server: https://acme-v02.api.letsencrypt.org/directory
+    privateKeySecretRef:
+      name: letsencrypt-production-account
+    solvers:
+      - dns01:
+          cloudflare:
+            apiTokenSecretRef:
+              name: cert-manager-cloudflare
+              key: api-token
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: cloudflared
+  namespace: ingress-system
+automountServiceAccountToken: false
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cloudflared
+  namespace: ingress-system
+  annotations:
+    argocd.argoproj.io/sync-wave: "-5"
+    rs.io/network-policy: enforced
+    rs.io/secret-reload-contract: rollout-required
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: cloudflared
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: cloudflared
+    spec:
+      serviceAccountName: cloudflared
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        fsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: cloudflared
+          image: docker.io/cloudflare/cloudflared@sha256:e39ee8da81ad5e05d77f38d2f51c60ca51bf2a8450ac3abab50c17fdb91d91bf
+          args:
+            - tunnel
+            - --no-autoupdate
+            - --url
+            - http://traefik-public.ingress-system.svc.cluster.local:8080
+            - run
+          env:
+            - name: TUNNEL_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: cloudflared-tunnel
+                  key: token
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 250m
+              memory: 128Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            readOnlyRootFilesystem: true
+          livenessProbe:
+            exec:
+              command:
+                - cloudflared
+                - version
+            initialDelaySeconds: 10
+            periodSeconds: 30
+          readinessProbe:
+            exec:
+              command:
+                - cloudflared
+                - version
+            initialDelaySeconds: 5
+            periodSeconds: 10
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: cloudflared
+  namespace: ingress-system
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: cloudflared
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: traefik-public
+  namespace: ingress-system
+  annotations:
+    rs.io/surface: public-human
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: traefik
+    app.kubernetes.io/instance: traefik-ingress-system
+  ports:
+    - name: public
+      port: 8080
+      targetPort: 8000
+      protocol: TCP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: traefik-private
+  namespace: ingress-system
+  annotations:
+    rs.io/surface: private-operator
+    rs.io/promotion-placeholder: private-source-cidr
+spec:
+  type: NodePort
+  externalTrafficPolicy: Local
+  selector:
+    app.kubernetes.io/name: traefik
+    app.kubernetes.io/instance: traefik-ingress-system
+  ports:
+    - name: private
+      port: 8443
+      targetPort: 8443
+      nodePort: 30443
+      protocol: TCP

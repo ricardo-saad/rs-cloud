@@ -1,0 +1,51 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny
+  namespace: platform-system
+  annotations:
+    argocd.argoproj.io/sync-wave: "-19"
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny
+  namespace: ingress-system
+  annotations:
+    argocd.argoproj.io/sync-wave: "-19"
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny
+  namespace: cnpg-system
+  annotations:
+    argocd.argoproj.io/sync-wave: "-19"
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny
+  namespace: rs-console
+  annotations:
+    argocd.argoproj.io/sync-wave: "-19"
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
